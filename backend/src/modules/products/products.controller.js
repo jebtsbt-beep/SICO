@@ -1,36 +1,41 @@
 const Product = require('./products.service');
 
+// 1. Obtener todos
 exports.getAll = async (req, res) => {
-    const data = await Product.getAll(req.query.companyId || 1);
-    res.json({ success: true, data });
-};
-
-exports.induct = async (req, res) => {
     try {
-        const id = await Product.inductFullProduct(req.body.companyId, req.body.product, req.body.ingredients);
-        res.status(201).json({ success: true, productId: id });
-    } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+        const data = await Product.getAll(req.query.companyId || 1);
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 };
 
-exports.delete = async (req, res) => {
-    await Product.delete(req.params.id);
-    res.json({ success: true, message: "Producto y receta eliminados" });
+// 2. Crear (Inducción)
+exports.create = async (req, res) => {
+    try {
+        const { companyId, product, ingredients } = req.body;
+        const result = await Product.create(companyId, product, ingredients);
+        res.status(201).json({ success: true, productId: result.productId, isActive: result.isActive });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 };
 
+// 3. Actualizar
 exports.update = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { name, salePrice, isActive, barcode, ingredients } = req.body;
+        await Product.update(req.params.id, req.body.product, req.body.ingredients);
+        res.json({ success: true, message: "Producto actualizado" });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
 
-        // 1. Actualizar datos maestros del producto
-        await Product.update(id, { name, salePrice, isActive, barcode });
-
-        // 2. Si se envían ingredientes, actualizar la receta
-        if (ingredients && ingredients.length > 0) {
-            await Product.updateRecipe(id, ingredients);
-        }
-
-        res.json({ success: true, message: "Producto y receta actualizados correctamente" });
+// 4. Borrar (ESTA ES LA QUE ESTÁ FALLANDO)
+exports.delete = async (req, res) => {
+    try {
+        await Product.delete(req.params.id);
+        res.json({ success: true, message: "Producto eliminado" });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }

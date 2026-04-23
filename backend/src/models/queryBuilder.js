@@ -30,6 +30,35 @@ const Query = {
                 resolve({ id: this.lastID, changes: this.changes });
             });
         });
+    },
+    // Iniciar Transacción
+    beginTransaction: () => {
+        return new Promise((resolve, reject) => {
+            db.run("BEGIN TRANSACTION", (err) => {
+                if (err) reject(err);
+                resolve();
+            });
+        });
+    },
+
+    // Confirmar cambios
+    commit: () => {
+        return new Promise((resolve, reject) => {
+            db.run("COMMIT", (err) => {
+                if (err) reject(err);
+                resolve();
+            });
+        });
+    },
+
+    // Cancelar todo si algo falla
+    rollback: () => {
+        return new Promise((resolve, reject) => {
+            db.run("ROLLBACK", (err) => {
+                if (err) reject(err);
+                resolve();
+            });
+        });
     }
 };
 

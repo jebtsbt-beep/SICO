@@ -26,9 +26,12 @@ CREATE TABLE IF NOT EXISTS supplies (
     company_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     base_unit_id INTEGER NOT NULL,
+    is_active INTEGER DEFAULT 0, 
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES companies(id),
     FOREIGN KEY (base_unit_id) REFERENCES measurement_units(id)
 );
+
 
 CREATE TABLE IF NOT EXISTS provider_supplies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

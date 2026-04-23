@@ -1,43 +1,33 @@
 const QueryBuilder = require('../../models/queryBuilder');
 
 class Supply {
-    static async create({ companyId, name, baseUnitId }) {
+    static async getAll(companyId) {
+        return await QueryBuilder.all("SELECT * FROM supplies WHERE company_id = ?", [companyId]);
+    }
+
+    static async getByName(name, companyId) {
+        return await QueryBuilder.get("SELECT * FROM supplies WHERE name = ? AND company_id = ?", [name, companyId]);
+    }
+
+    static async create(data) {
+        const existing = await this.getByName(data.name, data.companyId);
+        if (existing) return existing.id;
+
         const sql = `INSERT INTO supplies (company_id, name, base_unit_id) VALUES (?, ?, ?)`;
-        const result = await QueryBuilder.run(sql, [companyId, name, baseUnitId]);
-        return result.id;
+        const res = await QueryBuilder.run(sql, [data.companyId, data.name, data.baseUnitId]);
+        return res.id;
     }
 
-    // Relaciona el insumo con su proveedor y empaque (Inducción)
-    static async linkToProvider({ supplyId, providerId, itemCode, unitId, factor, price }) {
-        const sql = `
-            INSERT INTO provider_supplies 
-            (supply_id, provider_id, provider_item_code, purchase_unit_id, conversion_factor, last_price) 
-            VALUES (?, ?, ?, ?, ?, ?)`;
-        return await QueryBuilder.run(sql, [supplyId, providerId, itemCode, unitId, factor, price]);
+    static async update(id, data) {
+        return await QueryBuilder.run(`UPDATE supplies SET name = ?, base_unit_id = ? WHERE id = ?`, 
+            [data.name, data.baseUnitId, id]);
     }
 
-    // SELECT: Ver todos los insumos de una empresa con su stock total
-    static async getByCompany(companyId) {
-        const sql = `
-            SELECT s.*, SUM(ps.current_stock) as total_stock, mu.abbreviation
-            FROM supplies s
-            LEFT JOIN provider_supplies ps ON s.id = ps.supply_id
-            JOIN measurement_units mu ON s.base_unit_id = mu.id
-            WHERE s.company_id = ?
-            GROUP BY s.id`;
-        return await QueryBuilder.all(sql, [companyId]);
-    }
-
-    // UPDATE: Cambio de nombre o alertas de stock
-    static async update(id, { name }) {
-        return await QueryBuilder.run("UPDATE supplies SET name = ? WHERE id = ?", [name, id]);
-    }
-
-    // DELETE: Borrado en cascada (Si borras el insumo, se borran sus precios de proveedores)
     static async delete(id) {
-        // SQLite con ON DELETE CASCADE en la tabla provider_supplies se encarga del resto
+        const inRecipe = await QueryBuilder.get("SELECT product_id FROM product_supplies WHERE supply_id = ?", [id]);
+        if (inRecipe) throw new Error("Insumo bloqueado: Está en una receta de producto.");
+        await QueryBuilder.run("DELETE FROM provider_supplies WHERE supply_id = ?", [id]);
         return await QueryBuilder.run("DELETE FROM supplies WHERE id = ?", [id]);
     }
 }
-
 module.exports = Supply;

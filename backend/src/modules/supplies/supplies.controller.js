@@ -1,6 +1,6 @@
 const Supply = require('./supplies.service');
 
-const getAllSupplies = async (req, res) => {
+exports.getAll = async (req, res) => {
     try {
         const { companyId } = req.query; // Lo filtramos por empresa
         const supplies = await Supply.getByCompany(companyId || 1);
@@ -11,7 +11,17 @@ const getAllSupplies = async (req, res) => {
     }
 };
 
-const updateSupply = async (req, res) => {
+exports.create = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await Supply.create(id, req.body);
+        res.json({ success: true, message: "Suministro actualizado correctamente" });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+exports.update = async (req, res) => {
     try {
         const { id } = req.params;
         await Supply.update(id, req.body);
@@ -21,7 +31,7 @@ const updateSupply = async (req, res) => {
     }
 };
 
-const deleteSupply = async (req, res) => {
+exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
         await Supply.delete(id);
@@ -29,10 +39,4 @@ const deleteSupply = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
-};
-
-module.exports = {
-    getAllSupplies,
-    updateSupply,
-    deleteSupply
 };
