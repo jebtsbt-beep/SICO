@@ -1,4 +1,4 @@
-const Supply = require('./supplies.services');
+const Supply = require('./supplies.service');
 
 const getAllSupplies = async (req, res) => {
     try {
