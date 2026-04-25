@@ -1,8 +1,8 @@
 const QueryBuilder = require('../../models/queryBuilder');
 
-class Company {
+class CompanyService {
     static async getAll() {
-        return await QueryBuilder.all("SELECT * FROM companies");
+        return await QueryBuilder.all("SELECT * FROM companies ORDER BY id DESC");
     }
 
     static async getById(id) {
@@ -10,52 +10,29 @@ class Company {
     }
 
     static async create(data) {
-        try {
-            await QueryBuilder.beginTransaction();
-            const sql = `INSERT INTO companies (name, description) VALUES (?, ?)`;
-            const res = await QueryBuilder.run(sql, [data.name, data.description]);
-            await QueryBuilder.commit();
-            return res.id;
-        } catch (error) {
-            await QueryBuilder.rollback();
-            throw error;
-        }
+        const sql = `INSERT INTO companies (name, description) VALUES (?, ?)`;
+        // Usamos "" si data.description no existe
+        const res = await QueryBuilder.run(sql, [data.name, data.description || ""]);
+        return res.id;
     }
 
     static async update(id, data) {
-        try {
-            await QueryBuilder.beginTransaction();
-            const sql = `UPDATE companies SET name = ?, description = ? WHERE id = ?`;
-            await QueryBuilder.run(sql, [data.name, data.description, id]);
-            await QueryBuilder.commit();
-        } catch (error) {
-            await QueryBuilder.rollback();
-            throw error;
-        }
+        const sql = `UPDATE companies SET name = ?, description = ? WHERE id = ?`;
+        const res = await QueryBuilder.run(sql, [data.name, data.description, id]);
+        if (res.changes === 0) throw new Error("ERR_NOT_FOUND: Empresa no encontrada.");
+        return res;
     }
 
     static async delete(id) {
-        try {
-            await QueryBuilder.beginTransaction();
-
-            // 1. Verificación de Integridad: ¿Tiene productos o insumos asociados?
-            const hasProducts = await QueryBuilder.get("SELECT id FROM products WHERE company_id = ?", [id]);
-            const hasSupplies = await QueryBuilder.get("SELECT id FROM supplies WHERE company_id = ?", [id]);
-
-            if (hasProducts || hasSupplies) {
-                throw new Error("INTEGRITY_ERR: No se puede eliminar la empresa porque tiene productos o insumos vinculados.");
-            }
-
-            // 2. Ejecutar eliminación
-            const res = await QueryBuilder.run("DELETE FROM companies WHERE id = ?", [id]);
-            
-            await QueryBuilder.commit();
-            return res;
-        } catch (error) {
-            await QueryBuilder.rollback();
-            throw error;
+        const hasProducts = await QueryBuilder.get("SELECT id FROM products WHERE company_id = ? LIMIT 1", [id]);
+        const hasSupplies = await QueryBuilder.get("SELECT id FROM supplies WHERE company_id = ? LIMIT 1", [id]);
+        if (hasProducts || hasSupplies) {
+            throw new Error("INTEGRITY_ERR: La empresa tiene productos o insumos vinculados.");
         }
+        const res = await QueryBuilder.run("DELETE FROM companies WHERE id = ?", [id]);
+        if (res.changes === 0) throw new Error("ERR_NOT_FOUND: Empresa no encontrada.");
+        return res;
     }
 }
 
-module.exports = Company;
+module.exports = CompanyService;

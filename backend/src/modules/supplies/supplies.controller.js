@@ -1,42 +1,97 @@
 const Supply = require('./supplies.service');
+const QueryBuilder = require('../../models/queryBuilder');
 
+// Obtener todos los insumos de una empresa
 exports.getAll = async (req, res) => {
+    console.log("[SUPPLIES CTRL] GET ALL- companyId: ", req.params.companyId);
     try {
-        const { companyId } = req.query; // Lo filtramos por empresa
-        const supplies = await Supply.getByCompany(companyId || 1);
-        console.log(supplies)
-        res.json({ success: true, data: supplies });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        const data = await Supply.getAll(req.params.companyId);
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
     }
 };
 
+// Obtener insumo por ID
+exports.getById = async (req, res) => {
+    try {
+        const data = await Supply.getById(req.params.id);
+        if (!data) return res.status(404).json({ success: false, message: "No encontrado" });
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// Crear insumo (Inicia inactivo por defecto)
 exports.create = async (req, res) => {
+    console.log(req.body);
+    console.log("[SUPPLIES CTRL] CREATE:", req.body.name);
     try {
-        const { id } = req.params;
-        await Supply.create(id, req.body);
-        res.json({ success: true, message: "Suministro actualizado correctamente" });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        await QueryBuilder.beginTransaction();
+        const id = await Supply.create(req.body);
+        await QueryBuilder.commit();
+        res.status(201).json({ success: true, supplyId: id });
+    } catch (err) {
+        await QueryBuilder.rollback();
+        res.status(500).json({ success: false, error: err.message });
     }
 };
 
+// Actualizar insumo (Dispara verificación de estado)
 exports.update = async (req, res) => {
+    console.log("[SUPPLIES CTRL] UPDATE ID:", req.params.id);
     try {
-        const { id } = req.params;
-        await Supply.update(id, req.body);
-        res.json({ success: true, message: "Suministro actualizado correctamente" });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        await QueryBuilder.beginTransaction();
+        await Supply.update(req.params.id, req.body);
+        await QueryBuilder.commit();
+        res.json({ success: true, message: "Insumo actualizado" });
+    } catch (err) {
+        await QueryBuilder.rollback();
+        res.status(500).json({ success: false, error: err.message });
     }
 };
 
+// Eliminar insumo
 exports.delete = async (req, res) => {
+    console.log("[SUPPLIES CTRL] DELETE ID:", req.params.id);
     try {
-        const { id } = req.params;
-        await Supply.delete(id);
-        res.json({ success: true, message: "Suministro eliminado del sistema" });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        await QueryBuilder.beginTransaction();
+        await Supply.delete(req.params.id);
+        await QueryBuilder.commit();
+        res.json({ success: true, message: "Insumo eliminado" });
+    } catch (err) {
+        await QueryBuilder.rollback();
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// VINCULAR INSUMO A PRODUCTO (Link a Receta)
+exports.link = async (req, res) => {
+    console.log(`[SUPPLIES CTRL] LINK: Insumo ${req.body.supplyId} -> Producto ${req.body.productId}`);
+    try {
+        await QueryBuilder.beginTransaction();
+        // El service ejecuta verifyStatus(productId) internamente
+        await Supply.link(req.body);
+        await QueryBuilder.commit();
+        res.json({ success: true, message: "Receta actualizada. Producto verificado." });
+    } catch (err) {
+        await QueryBuilder.rollback();
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// DESVINCULAR INSUMO DE PRODUCTO (Unlink de Receta)
+exports.unlink = async (req, res) => {
+    console.log(`[SUPPLIES CTRL] UNLINK: Insumo ${req.body.supplyId} de Producto ${req.body.productId}`);
+    try {
+        await QueryBuilder.beginTransaction();
+        const { productId, supplyId } = req.body;
+        await Supply.unlink(productId, supplyId);
+        await QueryBuilder.commit();
+        res.json({ success: true, message: "Insumo fuera de receta. Producto re-verificado." });
+    } catch (err) {
+        await QueryBuilder.rollback();
+        res.status(500).json({ success: false, error: err.message });
     }
 };

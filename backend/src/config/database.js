@@ -28,6 +28,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
     }
 });
 
+db.run("PRAGMA foreign_keys = ON;", (err) => {
+    if (err) console.error("Error activando FKs", err);
+    else console.log("Seguridad de base de datos: ACTIVADA");
+});
+
 async function initializeDatabase() {
     try {
         // 1. Aplicar Esquema

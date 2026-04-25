@@ -3,7 +3,9 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); 
+app.use(express.urlencoded({ extended: true }));
+
 
 // Conexión de Rutas a los Pilares de SICO
 app.use('/api/providers', require('./modules/providers/providers.routes'));
