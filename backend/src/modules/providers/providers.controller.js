@@ -48,23 +48,30 @@ exports.update = async (req, res) => {
         res.json({ success: true, message: "Proveedor actualizado" });
     } catch (err) {
         await QueryBuilder.rollback();
+        console.log(err);
         res.status(500).json({ success: false, error: err.message });
     }
 };
 
 // Eliminar proveedor (Dispara verificación de estado en insumos afectados)
 exports.delete = async (req, res) => {
-    console.log("[PROVIDERS CTRL] DELETE ID:", req.params.id);
+    console.log("[PRODUCTS CTRL] Eliminando proveedor ID:", req.params.id);
+
     try {
-        await QueryBuilder.beginTransaction();
-        await Provider.delete(req.params.id);
-        await QueryBuilder.commit();
-        res.json({ success: true, message: "Proveedor eliminado y estados actualizados" });
-    } catch (err) {
-        await QueryBuilder.rollback();
-        res.status(500).json({ success: false, error: err.message });
+        const { id } = req.params;
+        const { isDeleteComplete, targets } = req.body;
+        await QueryBuilder.run("BEGIN TRANSACTION");
+
+        await Provider.delete(id, isDeleteComplete, targets);
+
+        await QueryBuilder.run("COMMIT");
+        res.json({ success: true, message: "Operación de proveedor procesada" });
+    } catch (error) {
+        console.log(error)
+        await QueryBuilder.run("ROLLBACK");
+        res.status(500).json({ success: false, error: error.message });
     }
-};
+}
 
 // VINCULAR PROVEEDOR A INSUMO (Link)
 exports.link = async (req, res) => {

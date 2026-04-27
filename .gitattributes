@@ -1,0 +1,6 @@
+# Forzar a que todos los archivos de texto se normalicen a LF
+* text=auto eol=lf
+
+# Excepciones para archivos que deben ser binarios (imágenes, etc.)
+*.png binary
+*.jpg binary

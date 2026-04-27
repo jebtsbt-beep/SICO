@@ -42,7 +42,7 @@ exports.update = async (req, res) => {
         await QueryBuilder.beginTransaction();
         // Extraemos solo los campos editables manualmente, EXCLUYENDO is_active
         await Product.update(req.params.id, req.body);
-        
+
         // Forzamos que la función verifyStatus sea la que decida el estado final
         await Product.verifyStatus(req.params.id);        await QueryBuilder.commit();
         res.json({ success: true, message: "Producto actualizado" });
@@ -54,14 +54,17 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
     console.log("[PRODUCTS CTRL] Eliminando producto ID:", req.params.id);
+
     try {
-        await QueryBuilder.beginTransaction();
-        await Product.delete(req.params.id);
-        await QueryBuilder.commit();
+        const { id } = req.params;
+        await QueryBuilder.run("BEGIN TRANSACTION");
+
+        await ProductService.delete(id);
+
+        await QueryBuilder.run("COMMIT");
         res.json({ success: true, message: "Producto y receta eliminados" });
-    } catch (err) {
-        await QueryBuilder.rollback();
-        console.error("[PRODUCTS CTRL] Fallo al eliminar:", err.message);
-        res.status(500).json({ success: false, error: err.message });
+    } catch (error) {
+        await QueryBuilder.run("ROLLBACK");
+        res.status(500).json({ success: false, error: error.message });
     }
 };

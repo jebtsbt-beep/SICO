@@ -16,10 +16,10 @@ class ProductService {
         if (!company) throw new Error(`Operación Ilegal: La empresa con ID ${companyId} no existe.`);
         // 1. Crear el producto base
         const pRes = await QueryBuilder.run(
-            "INSERT INTO products (company_id, barcode, name, sale_price, is_active) VALUES (?, ?, ?, ?, 0)", 
+            "INSERT INTO products (company_id, barcode, name, sale_price, is_active) VALUES (?, ?, ?, ?, 0)",
             [companyId, productData.barcode, productData.name, productData.salePrice]
         );
-        
+
         // 2. Procesar cascada de ingredientes y proveedores
         await EntityProcessor.process(ingredients, DIMENSIONS.SUPPLIES, pRes.id, { companyId });
 
@@ -31,7 +31,7 @@ class ProductService {
     static async update(productId, data) {
         // 1. Actualizar datos básicos
         const companyId = data.companyId;
-        
+
         const sql = `UPDATE products SET barcode = ?, name = ?, sale_price = ? WHERE id = ?`;
         await QueryBuilder.run(sql, [data.barcode, data.name, data.salePrice, productId]);
 
@@ -44,24 +44,26 @@ class ProductService {
         return await this.verifyStatus(productId);
     }
 
+    static async delete(id) {
+        // Borrado de receta y maestro
+        await QueryBuilder.run("DELETE FROM product_supplies WHERE product_id = ?", [id]);
+        await QueryBuilder.run("DELETE FROM products WHERE id = ?", [id]);
+    }
+
     static async verifyStatus(productId) {
         const ingredients = await QueryBuilder.all(`
-            SELECT s.is_active FROM product_supplies ps 
-            JOIN supplies s ON ps.supply_id = s.id 
+            SELECT s.is_active FROM product_supplies ps
+            JOIN supplies s ON ps.supply_id = s.id
             WHERE ps.product_id = ?`, [productId]);
 
         // Un producto solo es activo si tiene ingredientes y todos están activos
         const isActive = (ingredients.length > 0 && ingredients.every(i => i.is_active === 1)) ? 1 : 0;
-        
+
         await QueryBuilder.run("UPDATE products SET is_active = ? WHERE id = ?", [isActive, productId]);
         console.log(`[PRODUCT SERVICE] Estado Producto ${productId}: ${isActive === 1 ? 'ACTIVO' : 'INACTIVO'}`);
         return isActive;
     }
 
-    static async delete(id) {
-        // Al borrar el producto, se borra la receta por FK (CASCADE)
-        return await QueryBuilder.run("DELETE FROM products WHERE id = ?", [id]);
-    }
 }
 
 module.exports = ProductService;

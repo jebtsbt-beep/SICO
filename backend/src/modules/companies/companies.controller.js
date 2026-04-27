@@ -24,12 +24,13 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     // Si ves este log, el JSON llegó bien
     console.log("[DEBUG] Body recibido:", req.body);
-    
+
     if (!req.body || Object.keys(req.body).length === 0) {
         return res.status(400).json({ error: "El cuerpo está vacío o mal formado" });
     }
 
     try {
+        await Company.create(req.body);
         // ... tu lógica de transacción
         res.status(201).json({ success: true, id: 1 });
     } catch (err) {

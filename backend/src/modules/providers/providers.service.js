@@ -23,24 +23,49 @@ class ProviderService {
         return await QueryBuilder.run(sql, [data.nit, data.name, data.phone, data.email, id]);
     }
 
-    static async delete(id) {
-        // Obtenemos los insumos afectados antes de borrar para actualizar su estado después
-        const affectedSupplies = await QueryBuilder.all("SELECT supply_id FROM provider_supplies WHERE provider_id = ?", [id]);
-        
-        await QueryBuilder.run("DELETE FROM provider_supplies WHERE provider_id = ?", [id]);
-        const res = await QueryBuilder.run("DELETE FROM providers WHERE id = ?", [id]);
+    static async delete(id, isDeleteComplete, targets = []) {
+        // 1. Mover el require al inicio para evitar retrasos
+        const SupplyService = require('../supplies/supplies.service');
 
-        // Verificación de estado para cada insumo que perdió a este proveedor
-        for (const s of affectedSupplies) {
-            await SupplyService.verifyStatus(s.supply_id);
+        if (isDeleteComplete) {
+            // 2. Usar un try/catch interno para loguear el error real antes de que suba al controlador
+            try {
+                const affected = await QueryBuilder.all(
+                    "SELECT supply_id FROM provider_supplies WHERE provider_id = ?",
+                    [id]
+                );
+
+                await QueryBuilder.run("DELETE FROM provider_supplies WHERE provider_id = ?", [id]);
+                await QueryBuilder.run("DELETE FROM providers WHERE id = ?", [id]);
+
+                if (affected && affected.length > 0) {
+                    for (const s of affected) {
+                        await SupplyService.verifyStatus(s.supply_id);
+                    }
+                }
+            } catch (dbError) {
+                console.error("ERROR CRÍTICO EN PROVIDER SERVICE:", dbError.message);
+                throw dbError; // Re-lanzamos para que el controlador haga el ROLLBACK
+            }
+        } else {
+            // DESCONEXIÓN SELECTIVA
+            for (const target of targets) {
+                // Validamos que el supplyId venga en el target
+                if (!target.supplyId) continue;
+
+                await QueryBuilder.run(
+                    "DELETE FROM provider_supplies WHERE provider_id = ? AND supply_id = ?",
+                    [id, target.supplyId]
+                );
+                await SupplyService.verifyStatus(target.supplyId);
+            }
         }
-        return res;
     }
 
     static async link(data) {
         const SupplyService = require('../supplies/supplies.service');
         const existing = await QueryBuilder.get(
-            "SELECT id FROM provider_supplies WHERE supply_id = ? AND provider_id = ?", 
+            "SELECT id FROM provider_supplies WHERE supply_id = ? AND provider_id = ?",
             [data.supplyId, data.providerId]
         );
 
@@ -51,7 +76,7 @@ class ProviderService {
             const sql = `INSERT INTO provider_supplies (supply_id, provider_id, provider_item_code, purchase_unit_id, conversion_factor, last_price) VALUES (?, ?, ?, ?, ?, ?)`;
             await QueryBuilder.run(sql, [data.supplyId, data.providerId, data.itemCode, data.unitId, data.factor, data.price]);
         }
-        
+
         // Ejecutar verificación de estado del insumo
         return await SupplyService.verifyStatus(data.supplyId);
     }
@@ -60,7 +85,7 @@ class ProviderService {
         const SupplyService = require('../supplies/supplies.service');
         const sql = `DELETE FROM provider_supplies WHERE supply_id = ? AND provider_id = ?`;
         await QueryBuilder.run(sql, [supplyId, providerId]);
-        
+
         // Ejecutar verificación de estado del insumo
         return await SupplyService.verifyStatus(supplyId);
     }

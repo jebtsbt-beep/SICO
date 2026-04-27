@@ -54,17 +54,25 @@ exports.update = async (req, res) => {
 
 // Eliminar insumo
 exports.delete = async (req, res) => {
-    console.log("[SUPPLIES CTRL] DELETE ID:", req.params.id);
+    console.log("[PRODUCTS CTRL] Eliminando producto ID:", req.params.id);
+
     try {
-        await QueryBuilder.beginTransaction();
-        await Supply.delete(req.params.id);
-        await QueryBuilder.commit();
-        res.json({ success: true, message: "Insumo eliminado" });
-    } catch (err) {
-        await QueryBuilder.rollback();
-        res.status(500).json({ success: false, error: err.message });
+        const { id } = req.params;
+        const { isDeleteComplete, targets } = req.body;
+        await QueryBuilder.run("BEGIN TRANSACTION");
+
+        await SupplyService.delete(id, isDeleteComplete, targets);
+
+        await QueryBuilder.run("COMMIT");
+        res.json({ success: true, message: "Operación de insumo procesada" });
+    } catch (error) {
+        await QueryBuilder.run("ROLLBACK");
+        const msg = error.message.includes("FOREIGN KEY")
+            ? "Imposible eliminar: El insumo sigue vinculado a recetas activas."
+            : error.message;
+        res.status(400).json({ success: false, error: msg });
     }
-};
+}
 
 // VINCULAR INSUMO A PRODUCTO (Link a Receta)
 exports.link = async (req, res) => {

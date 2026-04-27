@@ -46,36 +46,42 @@ class SupplyService {
         return await this.verifyStatus(supplyId);
     }
 
+    static async delete(id, isDeleteComplete, targets = []) {
+        const ProductService = require('../products/products.service');
+
+        if (isDeleteComplete) {
+            // Borrado total: proveedores primero, luego maestro
+            await QueryBuilder.run("DELETE FROM provider_supplies WHERE supply_id = ?", [id]);
+            await QueryBuilder.run("DELETE FROM supplies WHERE id = ?", [id]);
+        } else {
+            // Desconexión de recetas específicas (targets son IDs de productos)
+            for (const target of targets) {
+                await QueryBuilder.run(
+                    "DELETE FROM product_supplies WHERE supply_id = ? AND product_id = ?",
+                    [id, target.productId]
+                );
+                await ProductService.verifyStatus(target.productId);
+            }
+        }
+    }
+
     static async verifyStatus(supplyId) {
         const res = await QueryBuilder.get("SELECT COUNT(*) as count FROM provider_supplies WHERE supply_id = ?", [supplyId]);
         const isActive = res.count > 0 ? 1 : 0;
-        
+
         await QueryBuilder.run("UPDATE supplies SET is_active = ? WHERE id = ?", [isActive, supplyId]);
         console.log(`[SUPPLY SERVICE] Estado Insumo ${supplyId}: ${isActive === 1 ? 'ACTIVO' : 'INACTIVO'}`);
 
         // Notificar a los productos que usan este insumo
         const products = await QueryBuilder.all("SELECT product_id FROM product_supplies WHERE supply_id = ?", [supplyId]);
-        
+
         // Importación local para evitar círculo vicioso
-        const ProductService = require('../products/products.service'); 
+        const ProductService = require('../products/products.service');
         for (const p of products) {
             await ProductService.verifyStatus(p.product_id);
         }
-        
+
         return isActive;
-    }
-
-    static async delete(id) {
-        // Recuperar productos afectados antes de borrar
-        const affected = await QueryBuilder.all("SELECT product_id FROM product_supplies WHERE supply_id = ?", [id]);
-        
-        await QueryBuilder.run("DELETE FROM supplies WHERE id = ?", [id]);
-
-        // Re-verificar los productos que lo usaban
-        const ProductService = require('./products.service');
-        for (const p of affected) {
-            await ProductService.verifyStatus(p.product_id);
-        }
     }
 }
 
